@@ -29,7 +29,8 @@ const (
 	firstINode       fuseops.InodeID = 1023
 	dirDefaultMode                   = 0777 | os.ModeDir
 	fileDefaultMode                  = 0666
-	dirReadOnlyMode                  = 0777 | os.ModeDir
+	dirReadOnlyMode                  = 0755 | os.ModeDir
+	dirReadWriteMode                  = 0777 | os.ModeDir
 	fileReadOnlyMode                 = 0655
 	defaultUID                       = 0
 	defaultGID                       = 0
