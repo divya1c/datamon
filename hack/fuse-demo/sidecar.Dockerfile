@@ -53,6 +53,8 @@ COPY --from=base /stage /
 ENV ZONEINFO /zoneinfo.zip
 
 ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
-
-ENTRYPOINT [ "datamon-csi" ]
-CMD ["--help"]
+RUN useradd -u 1020 -ms /bin/bash developer
+RUN groupadd -g 2000 developers
+RUN usermod -g developers developer
+USER developer
+ENTRYPOINT [ "datamon" ]
