@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/oneconcern/datamon/pkg/model"
 
@@ -126,13 +127,13 @@ func processFiles(fileChan chan string, wg *sync.WaitGroup) {
 		if !ok {
 			break
 		}
+
 		fileListTxn.Insert(model.UnsafeStringToBytes(strings.TrimPrefix(fileEnt, filepath.Clean(generateParams.parentDir)+"/")+"\n"), nil)
 		count++
 		if count%10000 == 0 {
 			log.Printf("Processed count:%d files, last file:%s", count, strings.TrimPrefix(fileEnt, filepath.Clean(generateParams.parentDir)+"/"))
 		}
 	}
-
 	fileList = fileListTxn.Commit()
 	iterator := fileList.Root().Iterator()
 	file, err := os.Create(generateParams.output)
@@ -192,6 +193,22 @@ func processDir(dirChan chan *task, fileChan chan string) {
 				continue
 			}
 
+			if dirEnts.Len() == 0 {
+				if generateParams.deleteOldFiles {
+					info, err := os.Stat(directory)
+					if err == nil {
+						if expired(info.ModTime(), generateParams.deleteDuration) {
+							err = os.Remove(directory)
+							if err != nil {
+
+							}
+						}
+					} else {
+						logger.Error("failed to stat directory:" + directory + " err:%s" + err.Error())
+					}
+				}
+			}
+
 			var dirCount int
 
 			for _, dirEnt := range dirEnts {
@@ -200,7 +217,11 @@ func processDir(dirChan chan *task, fileChan chan string) {
 					continue
 				}
 				if dirEnt.IsRegular() || dirEnt.IsSymlink() {
-					fileChan <- directory + "/" + dirEnt.Name()
+					file := directory + "/" + dirEnt.Name()
+					processOldFiles(file)
+					if generateParams.generateFiles {
+						fileChan <- file
+					}
 				}
 			}
 
@@ -232,6 +253,37 @@ func processDir(dirChan chan *task, fileChan chan string) {
 		}
 		if !childTaskTriggered {
 			dirTask.done()
+		}
+	}
+}
+
+func expired(t time.Time, days time.Duration) bool {
+	return time.Now().Sub(t) > time.Duration(days*24*time.Hour)
+}
+
+func processOldFiles(fileEnt string) {
+	fileInfo, err := os.Stat(fileEnt)
+	if err != nil {
+		log.Printf("Filed to stat file:%s err:%s\n", fileEnt, err.Error())
+	} else {
+		deleted := false
+		if generateParams.deleteOldFiles {
+			if expired(fileInfo.ModTime(), generateParams.deleteDuration) {
+				err = os.Remove(fileEnt)
+				if err != nil {
+					fmt.Printf("Failed to delete file:%s err:%s\n", fileEnt, err)
+				} else {
+					deleted = true
+				}
+			}
+		}
+		if !deleted && generateParams.gcOldFiles {
+			if expired(fileInfo.ModTime(), generateParams.gcDuration) {
+				err = os.Rename(fileEnt, generateParams.gcFolder+"/"+fileEnt)
+				if err != nil {
+					fmt.Printf("Failed to garbage collect file:%s err:%s\n", fileEnt, err)
+				}
+			}
 		}
 	}
 }
@@ -289,13 +341,20 @@ var generateFileListCmd = &cobra.Command{
 }
 
 var generateParams struct {
-	parentDir       string
-	output          string
-	trimPrefix      string
-	parallel        bool
-	dirRoutines     int
-	dirChannelSize  int
-	fileChannelSize int
+	parentDir         string
+	output            string
+	trimPrefix        string
+	parallel          bool
+	dirRoutines       int
+	dirChannelSize    int
+	fileChannelSize   int
+	deleteOldFiles    bool
+	deleteDuration    time.Duration
+	gcDuration        time.Duration
+	gcFolder          string
+	gcOldFiles        bool
+	generateFiles     bool
+	deleteOldEmptyDir bool
 }
 
 func init() {
@@ -314,5 +373,11 @@ func init() {
 	generateFileListCmd.Flags().IntVarP(&generateParams.dirRoutines, "dir", "d", 10, "Concurrency number for directories")
 	generateFileListCmd.Flags().IntVarP(&generateParams.dirChannelSize, "dirc", "s", 400000, "Buffer size for directories queue")
 	generateFileListCmd.Flags().IntVarP(&generateParams.fileChannelSize, "filec", "f", 400000, "Buffer size for file queue")
+	generateFileListCmd.Flags().BoolVar(&generateParams.generateFiles, "generate", true, "Generate a list of files")
+	generateFileListCmd.Flags().BoolVar(&generateParams.gcOldFiles, "gc", false, "Move old files to a new location")
+	generateFileListCmd.Flags().BoolVar(&generateParams.deleteOldFiles, "delete", false, "Delete old files permanently")
+	generateFileListCmd.Flags().StringVar(&generateParams.gcFolder, "gcfolder", "", "Folder to stash gc files")
+	generateFileListCmd.Flags().DurationVar(&generateParams.deleteDuration, "deletetime", 40, "Delete files not updated in the duration specified in days")
+	generateFileListCmd.Flags().DurationVar(&generateParams.gcDuration, "gctime", 30, "Garbage collect files not updated in the duration specified in days")
 	rootCmd.AddCommand(generateFileListCmd)
 }
