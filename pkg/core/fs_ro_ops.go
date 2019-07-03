@@ -571,6 +571,7 @@ func (fs *readOnlyFsInternal) populateFS(bundle *Bundle) (*ReadOnlyFS, error) {
 		zap.String("bundle ID", fs.bundle.BundleID),
 		zap.Int("entryCount", count),
 	)
+	fs.fsDirStore = nil
 	return &ReadOnlyFS{
 		fsInternal: fs,
 		server:     fuseutil.NewFileSystemServer(fs),

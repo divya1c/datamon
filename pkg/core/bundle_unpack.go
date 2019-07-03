@@ -5,6 +5,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/oneconcern/datamon/pkg/cafs"
@@ -81,7 +82,10 @@ func unpackDataFiles(ctx context.Context, bundle *Bundle, file string) error {
 	concurrencyControl := make(chan struct{}, concurrentFileDownloads)
 	fmt.Printf("Downloading %d files\n", len(bundle.BundleEntries))
 	for _, b := range bundle.BundleEntries {
-		if file != "" && file != b.NameWithPath {
+		if file != "" && b.NameWithPath != file {
+			continue
+		}
+		if !strings.Contains(b.NameWithPath, "nogales_historical_one_87890512_2018082500") {
 			continue
 		}
 		wg.Add(1)

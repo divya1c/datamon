@@ -33,7 +33,6 @@ func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (n int,
 		return
 
 	} else {
-
 		var reader io.ReaderAt
 		var key cafs.Key
 
@@ -47,6 +46,13 @@ func (b *Bundle) ReadAt(file *fsEntry, destination []byte, offset int64) (n int,
 			)
 			return
 		}
+		defer func() {
+			rClose, ok := reader.(io.Closer)
+			if ok {
+				b.l.Info("Closing the reader")
+				rClose.Close()
+			}
+		}()
 
 		reader, err = b.cafs.GetAt(context.Background(), key)
 		if err != nil {
