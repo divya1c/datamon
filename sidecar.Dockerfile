@@ -20,9 +20,13 @@ RUN go build -o /stage/usr/bin/datamon --ldflags '-s -w -linkmode external -extl
 RUN upx /stage/usr/bin/datamon
 RUN md5sum /stage/usr/bin/datamon
 
+RUN go build -o /stage/usr/bin/migrate --ldflags '-s -w -linkmode external -extldflags "-static"' ./cmd/backup2blobs
+RUN upx /stage/usr/bin/migrate
+RUN md5sum /stage/usr/bin/migrate
 
 # dist-alike during development/debug
 RUN cp /stage/usr/bin/datamon /usr/bin/datamon
+RUN cp /stage/usr/bin/migrate /usr/bin/migrate
 
 ADD ./hack/fuse-demo/datamon.yaml /root/.datamon/datamon.yaml
 
