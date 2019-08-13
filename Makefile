@@ -18,6 +18,7 @@ TARGET_MAX_CHAR_NUM=25
 # Version and repo
 VERSION=$(shell git describe --tags)
 COMMIT=$(shell git rev-parse HEAD)
+RELEASE_TAG=$(shell ./hack/release_tag.sh)
 GITDIRTY=$(shell git diff --quiet || echo 'dirty')
 REPOSITORY ?= "gcr.io/onec-co"
 
@@ -55,6 +56,7 @@ build-and-push-fuse-sidecar:
 		-t gcr.io/onec-co/datamon-fuse-sidecar \
 		-t gcr.io/onec-co/datamon-fuse-sidecar:${GITHUB_USER}-$$(date '+%Y%m%d') \
 		-t gcr.io/onec-co/datamon-fuse-sidecar:$(subst /,_,$(GIT_BRANCH)) \
+		-t gcr.io/onec-co/datamon-fuse-sidecar:$(RELEASE_TAG) \
 		--ssh default \
 		-f sidecar.Dockerfile \
 		.
@@ -74,10 +76,15 @@ build-and-push-datamover:
 		-t gcr.io/onec-co/datamon-datamover \
 		-t gcr.io/onec-co/datamon-datamover:${GITHUB_USER}-$$(date '+%Y%m%d') \
 		-t gcr.io/onec-co/datamon-datamover:$(subst /,_,$(GIT_BRANCH)) \
+		-t gcr.io/onec-co/datamon-datamover:$(RELEASE_TAG) \
 		--ssh default \
 		-f datamover.Dockerfile \
 		.
 	docker push gcr.io/onec-co/datamon-datamover
+
+.PHONY: build-and-push-release-docker-images
+## build all docker images associated with a release
+build-and-push-release-docker-images: build-and-push-fuse-sidecar build-and-push-datamover
 
 .PHONY: build-datamon
 ## Build datamon docker container (datamon)
